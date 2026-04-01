@@ -1,0 +1,69 @@
+import pandas as pd
+
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import Pipeline
+
+# Load dataset from Excel file
+data = pd.read_excel("Conf_Text_Labels.xlsx")
+
+# Remove rows with missing text or labels
+data = data.dropna(subset=['Text', 'Conf Label'])
+
+# Ensure text column is treated as string
+data['Text'] = data['Text'].astype(str)
+
+# Filter out empty or whitespace-only text entries
+data = data[data['Text'].str.strip() != ""]
+
+# Convert label column to integer type
+data['Conf Label'] = data['Conf Label'].astype(int)
+
+# Define features and target
+features = data['Text']
+target = data['Conf Label']
+
+# Split data into training and testing sets
+feat_train, feat_test, targ_train, targ_test = train_test_split(
+    features, target,
+    test_size=0.2,
+    random_state=42
+)
+
+def optimize_rf_model(feat_train, targ_train):
+
+    # Create pipeline: text vectorization + random forest model
+    model_pipeline = Pipeline([
+        ('vectorizer', TfidfVectorizer()),
+        ('classifier', RandomForestClassifier(random_state=42))
+    ])
+
+    # Define parameter grid for random search
+    hyper_params = {
+        "vectorizer__max_features": [1000, 3000],
+        "vectorizer__ngram_range": [(1,1), (1,2)],
+        "classifier__n_estimators": [50, 100, 150],
+        "classifier__max_depth": [None, 10, 20],
+        "classifier__min_samples_split": [2, 5, 10]
+    }
+
+    # Perform randomized hyperparameter tuning
+    search = RandomizedSearchCV(
+        model_pipeline,
+        param_distributions=hyper_params,
+        n_iter=5,
+        cv=3,
+        random_state=42,
+        n_jobs=1
+    )
+
+    # Train model with search
+    search.fit(feat_train, targ_train)
+
+    return search.best_estimator_, search.best_params_
+
+# Get optimized model and parameters
+final_model, optimal_params = optimize_rf_model(feat_train, targ_train)
+
+print("Optimal Parameters:", optimal_params)
