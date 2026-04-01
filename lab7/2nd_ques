@@ -1,0 +1,90 @@
+import pandas as pd
+
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# classification algorithms
+from sklearn.svm import LinearSVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.neural_network import MLPClassifier
+
+# evaluation metrics
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+dataset = pd.read_excel("Conf_Text_Labels.xlsx")
+
+# clean missing entries
+dataset = dataset.dropna(subset=['Text', 'Conf Label'])
+
+# ensure correct data types
+dataset['Text'] = dataset['Text'].astype(str)
+dataset['Conf Label'] = dataset['Conf Label'].astype(int)
+
+# separate input and output
+input_text = dataset['Text']
+labels = dataset['Conf Label']
+
+
+# Split into train and test sets
+text_train, text_test, label_train, label_test = train_test_split(
+    input_text, labels, test_size=0.2, random_state=42
+)
+
+
+# Define multiple models
+
+classifier_dict = {
+    "SVM": LinearSVC(),
+    "Decision Tree": DecisionTreeClassifier(),
+    "Random Forest": RandomForestClassifier(),
+    "Naive Bayes": MultinomialNB(),
+    "AdaBoost": AdaBoostClassifier(),
+    "MLP": MLPClassifier(max_iter=300)
+}
+
+
+# Store evaluation outputs
+evaluation_results = []
+
+# Training and testing loop
+
+for model_name, clf_model in classifier_dict.items():
+
+    # create processing + model pipeline
+    text_pipeline = Pipeline([
+        ('vector', TfidfVectorizer()),
+        ('model', clf_model)
+    ])
+
+    # fit model
+    text_pipeline.fit(text_train, label_train)
+
+    # predictions for train and test data
+    train_predictions = text_pipeline.predict(text_train)
+    test_predictions = text_pipeline.predict(text_test)
+
+    # calculate performance scores
+    acc_train = accuracy_score(label_train, train_predictions)
+    acc_test = accuracy_score(label_test, test_predictions)
+
+    prec = precision_score(label_test, test_predictions, average='weighted')
+    rec = recall_score(label_test, test_predictions, average='weighted')
+    f1_val = f1_score(label_test, test_predictions, average='weighted')
+
+    # append results
+    evaluation_results.append([model_name, acc_train, acc_test, prec, rec, f1_val])
+
+# Convert results to DataFrame
+summary_df = pd.DataFrame(evaluation_results, columns=[
+    "Model",
+    "Training Accuracy",
+    "Testing Accuracy",
+    "Precision",
+    "Recall",
+    "F1 Score"
+])
+
+print(summary_df)
